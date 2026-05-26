@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Keys & Secrets
+*.pem
+*.key
+*.crt
+.env
+.env.*
+!.env.example
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Node / Dashboard
+node_modules/
+pms-dashboard/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# MinIO / DB data (local dev)
+infra/nginx/ssl/
+infra/.env.production

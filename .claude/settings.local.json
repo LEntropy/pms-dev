@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\mello\\\\Desktop\\\\PMS_dev\" -Recurse)",
+      "Bash(Select-Object FullName)",
+      "WebSearch",
+      "Bash(dir \"c:\\\\Users\\\\mello\\\\Desktop\\\\PMS_dev\")",
+      "PowerShell(docker --version)",
+      "PowerShell(docker compose version)",
+      "PowerShell(python --version)",
+      "PowerShell(pip --version)",
+      "PowerShell(New-Item -ItemType Directory -Path \"C:\\\\Users\\\\mello\\\\Desktop\\\\PMS_dev\\\\pms-server\\\\tests\" -Force)",
+      "PowerShell(New-Item -ItemType File -Path \"C:\\\\Users\\\\mello\\\\Desktop\\\\PMS_dev\\\\pms-server\\\\tests\\\\__init__.py\" -Force)",
+      "Bash(.venv\\\\Scripts\\\\pytest tests/ -v)",
+      "Bash(python -m venv .venv)",
+      "Bash(.venv/Scripts/pytest tests/test_compliance.py tests/test_security.py tests/test_policy_engine.py -v)",
+      "Bash(.venv/Scripts/pytest tests/test_api_auth.py -v)",
+      "Bash(.venv/Scripts/pytest tests/ -v --tb=short)",
+      "Bash(.venv/Scripts/pytest tests/ -v --tb=short -q)",
+      "Bash(gh auth *)",
+      "Bash(cd \"/c/Users/mello/Desktop/PMS_dev\" && find . -name \"*.pem\" -o -name \"*.key\" -o -name \".env\" -o -name \"*.env\" 2>/dev/null | grep -v \".git\" | grep -v \".venv\")",
+      "Read(//c/c/Users/mello/Desktop/**)"
+    ]
+  }
+}

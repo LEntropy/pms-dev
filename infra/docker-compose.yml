@@ -1,0 +1,174 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pms-postgres
+    environment:
+      POSTGRES_DB: pms
+      POSTGRES_USER: pms
+      POSTGRES_PASSWORD: pms_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: pms-redis
+    command: redis-server --requirepass redis_secret
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_secret", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: pms-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: pms_minio
+      MINIO_ROOT_PASSWORD: minio_secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: pms-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set pms http://minio:9000 pms_minio minio_secret;
+      mc mb --ignore-existing pms/patches;
+      mc mb --ignore-existing pms/agents;
+      mc anonymous set download pms/agents;
+      exit 0;
+      "
+
+  pms-server:
+    build:
+      context: ../pms-server
+      dockerfile: Dockerfile
+    container_name: pms-server
+    environment:
+      DATABASE_URL: postgresql+asyncpg://pms:pms_secret@postgres:5432/pms
+      REDIS_URL: redis://:redis_secret@redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: pms_minio
+      MINIO_SECRET_KEY: minio_secret
+      MINIO_BUCKET_PATCHES: patches
+      MINIO_BUCKET_AGENTS: agents
+      JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
+      SECRET_KEY: change_me_in_production
+      DEBUG: "true"
+      # LDAP (optional)
+      LDAP_URL: ""
+      LDAP_BIND_DN: ""
+      LDAP_BIND_PASSWORD: ""
+      LDAP_BASE_DN: "DC=company,DC=com"
+      # OpenVAS (optional)
+      OPENVAS_URL: ""
+      OPENVAS_USERNAME: "admin"
+      OPENVAS_PASSWORD: ""
+      # SMTP (optional)
+      SMTP_HOST: ""
+      SMTP_FROM: "pms@company.com"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../pms-server:/app
+      - jwt_keys:/app/keys
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  celery-worker:
+    build:
+      context: ../pms-server
+      dockerfile: Dockerfile
+    container_name: pms-celery-worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://pms:pms_secret@postgres:5432/pms
+      REDIS_URL: redis://:redis_secret@redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: pms_minio
+      MINIO_SECRET_KEY: minio_secret
+      MINIO_BUCKET_PATCHES: patches
+      MINIO_BUCKET_AGENTS: agents
+      JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
+      # LDAP (optional — leave empty to disable)
+      LDAP_URL: ""
+      LDAP_BIND_DN: ""
+      LDAP_BIND_PASSWORD: ""
+      LDAP_BASE_DN: "DC=company,DC=com"
+      # OpenVAS (optional — leave empty to disable)
+      OPENVAS_URL: ""
+      OPENVAS_USERNAME: "admin"
+      OPENVAS_PASSWORD: ""
+      # SMTP (optional)
+      SMTP_HOST: ""
+      SMTP_FROM: "pms@company.com"
+    volumes:
+      - ../pms-server:/app
+      - jwt_keys:/app/keys
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A app.tasks.celery_app worker --loglevel=info -Q default,deployment,reporting -c 4
+
+  celery-beat:
+    build:
+      context: ../pms-server
+      dockerfile: Dockerfile
+    container_name: pms-celery-beat
+    environment:
+      DATABASE_URL: postgresql+asyncpg://pms:pms_secret@postgres:5432/pms
+      REDIS_URL: redis://:redis_secret@redis:6379/0
+    volumes:
+      - ../pms-server:/app
+      - jwt_keys:/app/keys
+    depends_on:
+      - redis
+    # celerybeat-schedule 파일을 볼륨에 저장해 재시작 시 스케줄 유지
+    command: celery -A app.tasks.celery_app beat --loglevel=info --schedule=/app/celerybeat-schedule
+
+  nginx:
+    image: nginx:alpine
+    container_name: pms-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - pms-server
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  jwt_keys:

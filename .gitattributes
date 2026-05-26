@@ -1,0 +1,17 @@
+# 텍스트 파일 기본 LF
+* text=auto eol=lf
+
+# Shell 스크립트 — 반드시 LF
+*.sh text eol=lf
+
+# Windows 배치 파일은 CRLF 유지
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 바이너리 파일
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
+*.woff binary
+*.ttf binary
